@@ -106,6 +106,26 @@
     color: #999;
 }
 
+/* 在 style.css 文件中找到或添加 .fav-preview 规则 */
+.fav-preview {
+    margin-bottom: 5px;
+    line-height: 1.4;
+    max-height: 200px; /* 设置一个最大高度，例如 200px */
+    overflow-y: auto;  /* 内容超出时显示垂直滚动条 */
+    word-wrap: break-word; /* 允许长单词或链接换行 */
+    white-space: pre-wrap; /* 保留换行符和空格，并允许自动换行 */
+}
+
+.fav-preview.deleted {
+    color: #ff3a3a;
+    font-style: italic;
+    /* 如果需要，也为 deleted 状态应用 max-height 和 overflow */
+    max-height: 200px;
+    overflow-y: auto;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
 .favorite-toggle-icon i.fa-solid {
     color: #ffcc00;
 }
