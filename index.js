@@ -418,28 +418,33 @@ function renderFavoriteItem(favItem, index) {
  */
 function updateFavoritesPopup() {
     const chatMetadata = ensureFavoritesArrayExists();
-    // 检查 favoritesPopup 和 chatMetadata
     if (!favoritesPopup || !chatMetadata) {
         console.error(`${pluginName}: updateFavoritesPopup - Popup not ready or chatMetadata missing.`);
         return;
     }
 
-    const context = getContext(); // 获取其他上下文信息
+    // --- 调试日志：确认 favoritesPopup 和 favoritesPopup.content 是否有效 ---
+    if (!favoritesPopup.content) {
+        console.error(`${pluginName}: updateFavoritesPopup - favoritesPopup.content is null or undefined! Cannot update.`);
+        return;
+    }
+    console.log(`${pluginName}: updateFavoritesPopup - favoritesPopup.content element:`, favoritesPopup.content);
+    // --- 调试日志结束 ---
+
+
+    const context = getContext();
     const chatName = context.characterId ? context.name2 : `群组: ${context.groups.find(g => g.id === context.groupId)?.name || '未命名群组'}`;
     const totalFavorites = chatMetadata.favorites ? chatMetadata.favorites.length : 0;
-
     const sortedFavorites = chatMetadata.favorites ? [...chatMetadata.favorites].sort((a, b) => parseInt(b.messageId) - parseInt(a.messageId)) : [];
 
-    // Pagination
     const totalPages = Math.max(1, Math.ceil(totalFavorites / itemsPerPage));
     if (currentPage > totalPages) currentPage = totalPages;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalFavorites);
     const currentPageItems = sortedFavorites.slice(startIndex, endIndex);
 
-    // Build content string with a wrapper div
     let contentHtml = `
-        <div id="favorites-popup-content"> <!-- 添加顶层容器 -->
+        <div id="favorites-popup-content">
             <div class="favorites-header">
                 <h3>${chatName} - ${totalFavorites} 条收藏</h3>
             </div>
@@ -469,19 +474,19 @@ function updateFavoritesPopup() {
                 <button class="menu_button clear-invalid">清理无效收藏</button>
                 <button class="menu_button close-popup">关闭</button>
             </div>
-        </div> <!-- 闭合顶层容器 -->
+        </div>
     `;
 
-    // Use setContent to update the popup's content
+    // --- 修改：直接设置 innerHTML ---
     try {
-        favoritesPopup.setContent(contentHtml);
-         console.log(`${pluginName}: Popup content updated successfully.`);
+        favoritesPopup.content.innerHTML = contentHtml; // 直接修改 DOM 元素的 innerHTML
+        console.log(`${pluginName}: Popup content updated using innerHTML.`);
     } catch (error) {
-         console.error(`${pluginName}: Error setting popup content:`, error);
+         console.error(`${pluginName}: Error setting popup innerHTML:`, error);
     }
+    // --- 修改结束 ---
 
-    // favoritesPopup.content = content; // 不再使用这种方式
-    // favoritesPopup.update(); // setContent 内部应该会处理更新，通常不需要再调用 update()
+    // favoritesPopup.setContent(contentHtml); // 不再使用 setContent
 }
 
 /**
