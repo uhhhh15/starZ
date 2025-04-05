@@ -506,10 +506,8 @@ function showFavoritesPopup() {
 
             console.log(`${pluginName}: Popup instance created successfully.`);
 
-            // --- 修改事件监听器的附加目标 ---
             // 将事件监听器附加到 popup 的内容容器 (favoritesPopup.content) 上
             $(favoritesPopup.content).on('click', function(event) {
-            // --- 修改结束 ---
                 const target = $(event.target);
 
                 // 注意：这里的事件处理逻辑应该保持不变，因为它是在 content 容器内部查找元素
