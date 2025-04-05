@@ -497,71 +497,116 @@ function updateFavoritesPopup() {
  */
 function showFavoritesPopup() {
     if (!favoritesPopup) {
+        console.log(`${pluginName}: Creating new Popup instance.`); // 添加日志
         try {
-            // 提供默认内容或空字符串，将在 updateFavoritesPopup 中填充
-            favoritesPopup = new Popup('收藏消息', '<div class="spinner"></div>'); // 使用加载指示器
-            favoritesPopup.width = 600;
+            // 1. 定义初始内容 (可以是空的或加载指示器)
+            const initialContent = '<div class="favorites-list-placeholder" style="padding: 10px;">加载中...</div>';
+            // 2. 定义唯一的 Popup ID
+            const popupId = 'favorites-popup-main'; // 给一个有意义的 ID
+            // 3. 定义选项对象，在这里设置标题和宽度等
+            const popupOptions = {
+                title: '收藏管理', // 设置标题
+                wide: true       // 让弹窗更宽
+                // 你可以在这里添加其他 Popup 支持的选项
+            };
 
-            // 确保 popup 元素存在后再添加事件监听器
-            if (favoritesPopup.popup) {
-                favoritesPopup.popup.addEventListener('click', function(event) {
-                    const target = $(event.target);
-                    const chatMetadata = ensureFavoritesArrayExists(); // 获取当前元数据
+            // 4. 使用正确的参数调用构造函数
+            favoritesPopup = new Popup(initialContent, popupId, popupOptions);
 
-                    // Handle pagination
-                    if (target.hasClass('pagination-prev')) {
-                        if (currentPage > 1) {
-                            currentPage--;
-                            updateFavoritesPopup(); // 更新弹窗
-                        }
-                    } else if (target.hasClass('pagination-next')) {
-                        // 需要重新计算总页数，因为收藏可能已变化
-                        const totalFavs = (chatMetadata && Array.isArray(chatMetadata.favorites)) ? chatMetadata.favorites.length : 0;
-                        const totalPages = Math.max(1, Math.ceil(totalFavs / itemsPerPage));
-                        if (currentPage < totalPages) {
-                            currentPage++;
-                            updateFavoritesPopup(); // 更新弹窗
-                        }
-                    }
-                    // Handle close button
-                    else if (target.hasClass('close-popup')) {
-                        favoritesPopup.hide();
-                    }
-                    // Handle clear invalid button
-                    else if (target.hasClass('clear-invalid')) {
-                        handleClearInvalidFavorites();
-                    }
-                    // Handle edit note (pencil icon)
-                    else if (target.hasClass('fa-pencil')) {
-                        const favItemElement = target.closest('.favorite-item');
-                        if (favItemElement) {
-                            const favId = favItemElement.data('fav-id');
-                            handleEditNote(favId);
-                        }
-                    }
-                    // Handle delete favorite (trash icon)
-                    else if (target.hasClass('fa-trash')) {
-                         const favItemElement = target.closest('.favorite-item');
-                         if (favItemElement) {
-                            const favId = favItemElement.data('fav-id');
-                            const msgId = favItemElement.data('msg-id'); // 获取 messageId
-                            handleDeleteFavoriteFromPopup(favId, msgId); // 传递 messageId
-                         }
-                    }
-                });
-            } else {
-                 console.error(`${pluginName}: Failed to create popup element.`);
+            // 5. (可选但推荐) 检查实例是否有效
+            if (!favoritesPopup || typeof favoritesPopup.update !== 'function' || typeof favoritesPopup.show !== 'function') {
+                 console.error(`${pluginName}: Failed to create a valid Popup instance after constructor call.`);
+                 logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
+                 favoritesPopup = null; // 重置为 null，防止后续错误
+                 return; // 创建失败，直接返回
             }
-        } catch(error) {
+
+            // 6. (可选) 设置特定宽度，如果 wide 不够精确的话
+            // favoritesPopup.width = 600; // 可以保留，也可以移除，看 wide: true 的效果
+
+            // 7. 设置事件监听器 (保持不变)
+            favoritesPopup.popup.addEventListener('click', function(event) {
+                const target = $(event.target);
+
+                // Handle pagination
+                if (target.hasClass('pagination-prev')) {
+                    if (currentPage > 1) {
+                        currentPage--;
+                        updateFavoritesPopup();
+                    }
+                } else if (target.hasClass('pagination-next')) {
+                    // 确保 chatMetadata 和 favorites 存在
+                    const chatMetadata = ensureFavoritesArrayExists();
+                    const totalFavorites = chatMetadata ? (chatMetadata.favorites || []).length : 0;
+                    const totalPages = Math.max(1, Math.ceil(totalFavorites / itemsPerPage));
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        updateFavoritesPopup();
+                    }
+                }
+                // Handle close button
+                else if (target.hasClass('close-popup')) {
+                    favoritesPopup.hide();
+                }
+                // Handle clear invalid button
+                else if (target.hasClass('clear-invalid')) {
+                    handleClearInvalidFavorites();
+                }
+                // Handle edit note (pencil icon)
+                else if (target.hasClass('fa-pencil')) {
+                    const favItem = target.closest('.favorite-item');
+                    if (favItem && favItem.data('fav-id')) { // 增加检查
+                       const favId = favItem.data('fav-id');
+                       handleEditNote(favId);
+                    }
+                }
+                // Handle delete favorite (trash icon)
+                else if (target.hasClass('fa-trash')) {
+                    const favItem = target.closest('.favorite-item');
+                    if (favItem && favItem.data('fav-id') && favItem.data('msg-id') !== undefined) { // 增加检查
+                        const favId = favItem.data('fav-id');
+                        const msgId = String(favItem.data('msg-id')); // 确保是字符串
+                        handleDeleteFavoriteFromPopup(favId, msgId);
+                    }
+                }
+            });
+            console.log(`${pluginName}: Popup instance created and listeners attached successfully.`);
+
+        } catch (error) {
             console.error(`${pluginName}: Error creating Popup instance:`, error);
-            callGenericPopup("无法创建收藏弹窗。", POPUP_TYPE.ERROR);
-            return; // 创建失败则不继续
+            logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
+            favoritesPopup = null; // 确保在出错时重置为 null
+            return; // 创建失败，直接返回
         }
+    } else {
+        console.log(`${pluginName}: Reusing existing Popup instance.`);
     }
 
+    // --- 后续逻辑 ---
+    // 检查 favoritesPopup 是否真的有效
+    if (!favoritesPopup || typeof favoritesPopup.update !== 'function' || typeof favoritesPopup.show !== 'function') {
+        console.error(`${pluginName}: Cannot proceed, favoritesPopup is not a valid instance.`);
+        logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
+        return;
+    }
+
+    // Reset to first page when opening
     currentPage = 1;
-    updateFavoritesPopup(); // 总是更新内容
+    // Update popup content
+    console.log(`${pluginName}: Calling updateFavoritesPopup...`);
+    updateFavoritesPopup(); // 这个函数内部也需要检查 favoritesPopup 是否有效
+    // Show the popup
+    console.log(`${pluginName}: Calling favoritesPopup.show()...`);
     favoritesPopup.show();
+}
+
+// 辅助函数，用于打印 favoritesPopup 的状态
+function logPopupState(popupInstance) {
+    console.log(`${pluginName}: Current state of favoritesPopup:`, popupInstance);
+    if (popupInstance) {
+        console.log(`${pluginName}: typeof favoritesPopup.update:`, typeof popupInstance.update);
+        console.log(`${pluginName}: typeof favoritesPopup.show:`, typeof popupInstance.show);
+    }
 }
 
 /**
