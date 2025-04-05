@@ -497,115 +497,98 @@ function updateFavoritesPopup() {
  */
 function showFavoritesPopup() {
     if (!favoritesPopup) {
-        console.log(`${pluginName}: Creating new Popup instance.`); // 添加日志
+        // Create a new popup if it doesn't exist
         try {
-            // 1. 定义初始内容 (可以是空的或加载指示器)
-            const initialContent = '<div class="favorites-list-placeholder" style="padding: 10px;">加载中...</div>';
-            // 2. 定义唯一的 Popup ID
-            const popupId = 'favorites-popup-main'; // 给一个有意义的 ID
-            // 3. 定义选项对象，在这里设置标题和宽度等
-            const popupOptions = {
-                title: '收藏管理', // 设置标题
-                wide: true       // 让弹窗更宽
-                // 你可以在这里添加其他 Popup 支持的选项
-            };
+            // 提供一个基础的 content (比如空的 div 或加载提示)
+            // 选择一个基础类型，如 POPUP_TYPE.TEXT 或 .DISPLAY
+            // 使用 options 对象设置标题和宽度
+            favoritesPopup = new Popup(
+                '<div class="spinner"></div>', // 初始内容，可以是个加载动画
+                POPUP_TYPE.TEXT,               // 或者 POPUP_TYPE.DISPLAY
+                '',                            // inputValue (第三参数)，这里不需要，用默认空字符串
+                {                              // options 对象 (第四参数)
+                    title: '收藏管理',         // 设置弹窗标题
+                    wide: true,                // 设置为宽弹窗
+                    // large: true,            // 如果需要更大，可以考虑这个
+                    okButton: false,           // 隐藏默认的 OK 按钮
+                    cancelButton: false,       // 隐藏默认的 Cancel 按钮
+                    allowVerticalScrolling: true // 允许内容垂直滚动
+                }
+            );
 
-            // 4. 使用正确的参数调用构造函数
-            favoritesPopup = new Popup(initialContent, popupId, popupOptions);
+            // favoritesPopup.width = 600; // 不再需要单独设置，已包含在 options 中
 
-            // 5. (可选但推荐) 检查实例是否有效
-            if (!favoritesPopup || typeof favoritesPopup.update !== 'function' || typeof favoritesPopup.show !== 'function') {
-                 console.error(`${pluginName}: Failed to create a valid Popup instance after constructor call.`);
-                 logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
-                 favoritesPopup = null; // 重置为 null，防止后续错误
-                 return; // 创建失败，直接返回
-            }
+            // --- 调试日志 ---
+            console.log(`${pluginName}: Popup instance created successfully.`);
 
-            // 6. (可选) 设置特定宽度，如果 wide 不够精确的话
-            // favoritesPopup.width = 600; // 可以保留，也可以移除，看 wide: true 的效果
-
-            // 7. 设置事件监听器 (保持不变)
-            favoritesPopup.popup.addEventListener('click', function(event) {
+            // Set up event delegation for popup interactions
+            // 将事件监听器附加到 popup 内部的稳定父元素上，而不是 popup 对象本身
+            // 假设你的 updateFavoritesPopup 会创建 #favorites-popup-content-wrapper
+            $(favoritesPopup.dom.content).on('click', function(event) {
                 const target = $(event.target);
 
-                // Handle pagination
+                // 找到具体的弹窗内容容器 (假设是 #favorites-popup-content)
+                const popupContent = $(this).find('#favorites-popup-content'); // 或你的实际容器选择器
+
+                // Handle pagination within the container
                 if (target.hasClass('pagination-prev')) {
                     if (currentPage > 1) {
                         currentPage--;
                         updateFavoritesPopup();
                     }
                 } else if (target.hasClass('pagination-next')) {
-                    // 确保 chatMetadata 和 favorites 存在
+                    // ... (获取 totalPages 的逻辑需要确保能在 updateFavoritesPopup 之外访问，或者重新计算)
+                    // 最好是在 updateFavoritesPopup 内部处理分页点击，因为它有最新的数据
+                    // 或者将 totalPages 存储在 favoritesPopup.dom 或其他地方
                     const chatMetadata = ensureFavoritesArrayExists();
-                    const totalFavorites = chatMetadata ? (chatMetadata.favorites || []).length : 0;
+                    const totalFavorites = chatMetadata ? chatMetadata.favorites.length : 0;
                     const totalPages = Math.max(1, Math.ceil(totalFavorites / itemsPerPage));
                     if (currentPage < totalPages) {
                         currentPage++;
                         updateFavoritesPopup();
                     }
                 }
-                // Handle close button
+                // Handle close button within the container
                 else if (target.hasClass('close-popup')) {
                     favoritesPopup.hide();
                 }
-                // Handle clear invalid button
+                // Handle clear invalid button within the container
                 else if (target.hasClass('clear-invalid')) {
                     handleClearInvalidFavorites();
                 }
-                // Handle edit note (pencil icon)
+                // Handle edit note (pencil icon) within the container
                 else if (target.hasClass('fa-pencil')) {
                     const favItem = target.closest('.favorite-item');
-                    if (favItem && favItem.data('fav-id')) { // 增加检查
-                       const favId = favItem.data('fav-id');
-                       handleEditNote(favId);
-                    }
+                    const favId = favItem.data('fav-id');
+                    handleEditNote(favId);
                 }
-                // Handle delete favorite (trash icon)
+                // Handle delete favorite (trash icon) within the container
                 else if (target.hasClass('fa-trash')) {
                     const favItem = target.closest('.favorite-item');
-                    if (favItem && favItem.data('fav-id') && favItem.data('msg-id') !== undefined) { // 增加检查
-                        const favId = favItem.data('fav-id');
-                        const msgId = String(favItem.data('msg-id')); // 确保是字符串
-                        handleDeleteFavoriteFromPopup(favId, msgId);
-                    }
+                    const favId = favItem.data('fav-id');
+                    const msgId = favItem.data('msg-id');
+                    handleDeleteFavoriteFromPopup(favId, msgId);
                 }
             });
-            console.log(`${pluginName}: Popup instance created and listeners attached successfully.`);
 
         } catch (error) {
-            console.error(`${pluginName}: Error creating Popup instance:`, error);
-            logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
-            favoritesPopup = null; // 确保在出错时重置为 null
-            return; // 创建失败，直接返回
+            console.error(`${pluginName}: Failed to create popup instance:`, error);
+            favoritesPopup = null; // 创建失败，重置变量
+            return; // 退出函数
         }
     } else {
-        console.log(`${pluginName}: Reusing existing Popup instance.`);
+         // --- 调试日志 ---
+         console.log(`${pluginName}: Reusing existing popup instance.`);
     }
 
-    // --- 后续逻辑 ---
-    // 检查 favoritesPopup 是否真的有效
-    if (!favoritesPopup || typeof favoritesPopup.update !== 'function' || typeof favoritesPopup.show !== 'function') {
-        console.error(`${pluginName}: Cannot proceed, favoritesPopup is not a valid instance.`);
-        logPopupState(favoritesPopup); // 打印 favoritesPopup 的状态
-        return;
-    }
 
     // Reset to first page when opening
     currentPage = 1;
-    // Update popup content
-    console.log(`${pluginName}: Calling updateFavoritesPopup...`);
-    updateFavoritesPopup(); // 这个函数内部也需要检查 favoritesPopup 是否有效
+    // Update popup content (调用这个函数来填充实际内容)
+    updateFavoritesPopup();
     // Show the popup
-    console.log(`${pluginName}: Calling favoritesPopup.show()...`);
-    favoritesPopup.show();
-}
-
-// 辅助函数，用于打印 favoritesPopup 的状态
-function logPopupState(popupInstance) {
-    console.log(`${pluginName}: Current state of favoritesPopup:`, popupInstance);
-    if (popupInstance) {
-        console.log(`${pluginName}: typeof favoritesPopup.update:`, typeof popupInstance.update);
-        console.log(`${pluginName}: typeof favoritesPopup.show:`, typeof popupInstance.show);
+    if (favoritesPopup) { // 再次检查以防创建失败
+        favoritesPopup.show();
     }
 }
 
