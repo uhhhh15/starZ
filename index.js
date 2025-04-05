@@ -418,44 +418,28 @@ function renderFavoriteItem(favItem, index) {
  */
 function updateFavoritesPopup() {
     const chatMetadata = ensureFavoritesArrayExists();
-    // 检查 favoritesPopup 是否存在，以及 chatMetadata 是否有效
+    // 检查 favoritesPopup 和 chatMetadata
     if (!favoritesPopup || !chatMetadata) {
-         console.warn(`${pluginName}: updateFavoritesPopup - Popup 未初始化或无法获取 chatMetadata`);
-         return;
-    }
-     // 确保 favorites 是数组
-    if (!Array.isArray(chatMetadata.favorites)) {
-        console.warn(`${pluginName}: updateFavoritesPopup - chatMetadata.favorites 不是数组`);
-        chatMetadata.favorites = []; // 修正为数组
+        console.error(`${pluginName}: updateFavoritesPopup - Popup not ready or chatMetadata missing.`);
+        return;
     }
 
-
-    const context = getContext();
+    const context = getContext(); // 获取其他上下文信息
     const chatName = context.characterId ? context.name2 : `群组: ${context.groups.find(g => g.id === context.groupId)?.name || '未命名群组'}`;
-    const totalFavorites = chatMetadata.favorites.length;
+    const totalFavorites = chatMetadata.favorites ? chatMetadata.favorites.length : 0;
 
-    // 按 messageId (视为数字) 倒序排序
-    const sortedFavorites = [...chatMetadata.favorites].sort((a, b) => {
-        const idA = parseInt(a.messageId, 10);
-        const idB = parseInt(b.messageId, 10);
-        // 处理 NaN 的情况，将 NaN 排在后面
-        if (isNaN(idA) && isNaN(idB)) return 0;
-        if (isNaN(idA)) return 1;
-        if (isNaN(idB)) return -1;
-        return idB - idA; // 倒序
-    });
+    const sortedFavorites = chatMetadata.favorites ? [...chatMetadata.favorites].sort((a, b) => parseInt(b.messageId) - parseInt(a.messageId)) : [];
 
     // Pagination
     const totalPages = Math.max(1, Math.ceil(totalFavorites / itemsPerPage));
     if (currentPage > totalPages) currentPage = totalPages;
-
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, totalFavorites);
     const currentPageItems = sortedFavorites.slice(startIndex, endIndex);
 
-    // Build content for the popup
-    let content = `
-        <div class="favorites-popup-content">
+    // Build content string with a wrapper div
+    let contentHtml = `
+        <div id="favorites-popup-content"> <!-- 添加顶层容器 -->
             <div class="favorites-header">
                 <h3>${chatName} - ${totalFavorites} 条收藏</h3>
             </div>
@@ -464,32 +448,40 @@ function updateFavoritesPopup() {
     `;
 
     if (totalFavorites === 0) {
-        content += `<div class="favorites-empty">当前没有收藏的消息。点击消息右下角的星形图标来添加收藏。</div>`;
+        contentHtml += `<div class="favorites-empty">当前没有收藏的消息。点击消息右下角的星形图标来添加收藏。</div>`;
     } else {
         currentPageItems.forEach((favItem, index) => {
-            content += renderFavoriteItem(favItem, startIndex + index);
+            contentHtml += renderFavoriteItem(favItem, startIndex + index);
         });
 
         if (totalPages > 1) {
-            content += `<div class="favorites-pagination">`;
-            content += `<button class="menu_button pagination-prev" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`;
-            content += `<span>${currentPage} / ${totalPages}</span>`;
-            content += `<button class="menu_button pagination-next" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>`;
-            content += `</div>`;
+            contentHtml += `<div class="favorites-pagination">`;
+            contentHtml += `<button class="menu_button pagination-prev" ${currentPage === 1 ? 'disabled' : ''}>上一页</button>`;
+            contentHtml += `<span>${currentPage} / ${totalPages}</span>`;
+            contentHtml += `<button class="menu_button pagination-next" ${currentPage === totalPages ? 'disabled' : ''}>下一页</button>`;
+            contentHtml += `</div>`;
         }
     }
 
-    content += `
+    contentHtml += `
             </div>
             <div class="favorites-footer">
                 <button class="menu_button clear-invalid">清理无效收藏</button>
                 <button class="menu_button close-popup">关闭</button>
             </div>
-        </div>
+        </div> <!-- 闭合顶层容器 -->
     `;
 
-    favoritesPopup.content = content;
-    favoritesPopup.update();
+    // Use setContent to update the popup's content
+    try {
+        favoritesPopup.setContent(contentHtml);
+         console.log(`${pluginName}: Popup content updated successfully.`);
+    } catch (error) {
+         console.error(`${pluginName}: Error setting popup content:`, error);
+    }
+
+    // favoritesPopup.content = content; // 不再使用这种方式
+    // favoritesPopup.update(); // setContent 内部应该会处理更新，通常不需要再调用 update()
 }
 
 /**
