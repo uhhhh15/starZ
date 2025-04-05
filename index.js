@@ -378,21 +378,26 @@ function renderFavoriteItem(favItem, index) {
         message = context.chat.find(msg => String(msg.id) === String(favItem.messageId));
     }
 
-
     let previewText = '';
     let deletedClass = '';
 
     if (message && message.mes) { // 增加对 message.mes 的检查
-        previewText = message.mes;
-        if (previewText.length > 100) {
-            previewText = previewText.substring(0, 100) + '...';
-        }
+        previewText = message.mes; // <--- 直接获取完整的消息内容
+
+        // --- 下面这部分截断逻辑被移除了 ---
+        // if (previewText.length > 100) {
+        //     previewText = previewText.substring(0, 100) + '...';
+        // }
+        // --- 截断逻辑移除结束 ---
+
         try {
+             // 现在 messageFormatting 会接收到完整的 previewText
              previewText = messageFormatting(previewText, favItem.sender, false,
                                             favItem.role === 'user', null, {}, false);
         } catch (e) {
              console.error(`${pluginName}: Error formatting message preview:`, e);
-             previewText = message.mes.substring(0, 100) + (message.mes.length > 100 ? '...' : ''); // Fallback to plain text
+             // Fallback 也使用完整的原始文本，不再截断
+             previewText = message.mes; // Fallback to plain full text if formatting fails
         }
     } else {
         previewText = '[消息内容不可用或已删除]'; // 更清晰的提示
@@ -400,10 +405,12 @@ function renderFavoriteItem(favItem, index) {
     }
 
     // 移除时间戳显示
+    // 注意：返回的 HTML 结构保持不变
     return `
         <div class="favorite-item" data-fav-id="${favItem.id}" data-msg-id="${favItem.messageId}" data-index="${index}">
             <div class="fav-meta">${favItem.sender} (${favItem.role})</div>
             <div class="fav-note" style="${favItem.note ? '' : 'display:none;'}">备注：${favItem.note || ''}</div>
+            {/* 这个 div 现在会包含完整的、可能经过格式化的消息内容 */}
             <div class="fav-preview ${deletedClass}">${previewText}</div>
             <div class="fav-actions">
                 <i class="fa-solid fa-pencil" title="编辑备注"></i>
