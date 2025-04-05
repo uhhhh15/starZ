@@ -491,47 +491,36 @@ function showFavoritesPopup() {
     if (!favoritesPopup) {
         // Create a new popup if it doesn't exist
         try {
-            // 提供一个基础的 content (比如空的 div 或加载提示)
-            // 选择一个基础类型，如 POPUP_TYPE.TEXT 或 .DISPLAY
-            // 使用 options 对象设置标题和宽度
             favoritesPopup = new Popup(
-                '<div class="spinner"></div>', // 初始内容，可以是个加载动画
-                POPUP_TYPE.TEXT,               // 或者 POPUP_TYPE.DISPLAY
-                '',                            // inputValue (第三参数)，这里不需要，用默认空字符串
-                {                              // options 对象 (第四参数)
-                    title: '收藏管理',         // 设置弹窗标题
-                    wide: true,                // 设置为宽弹窗
-                    // large: true,            // 如果需要更大，可以考虑这个
-                    okButton: false,           // 隐藏默认的 OK 按钮
-                    cancelButton: false,       // 隐藏默认的 Cancel 按钮
-                    allowVerticalScrolling: true // 允许内容垂直滚动
+                '<div class="spinner"></div>',
+                POPUP_TYPE.TEXT,
+                '',
+                {
+                    title: '收藏管理',
+                    wide: true,
+                    okButton: false,
+                    cancelButton: false,
+                    allowVerticalScrolling: true
                 }
             );
 
-            // favoritesPopup.width = 600; // 不再需要单独设置，已包含在 options 中
-
-            // --- 调试日志 ---
             console.log(`${pluginName}: Popup instance created successfully.`);
 
-            // Set up event delegation for popup interactions
-            // 将事件监听器附加到 popup 内部的稳定父元素上，而不是 popup 对象本身
-            // 假设你的 updateFavoritesPopup 会创建 #favorites-popup-content-wrapper
-            $(favoritesPopup.dom.content).on('click', function(event) {
+            // --- 修改事件监听器的附加目标 ---
+            // 将事件监听器附加到 popup 的内容容器 (favoritesPopup.content) 上
+            $(favoritesPopup.content).on('click', function(event) {
+            // --- 修改结束 ---
                 const target = $(event.target);
 
-                // 找到具体的弹窗内容容器 (假设是 #favorites-popup-content)
-                const popupContent = $(this).find('#favorites-popup-content'); // 或你的实际容器选择器
+                // 注意：这里的事件处理逻辑应该保持不变，因为它是在 content 容器内部查找元素
 
-                // Handle pagination within the container
+                // Handle pagination
                 if (target.hasClass('pagination-prev')) {
                     if (currentPage > 1) {
                         currentPage--;
                         updateFavoritesPopup();
                     }
                 } else if (target.hasClass('pagination-next')) {
-                    // ... (获取 totalPages 的逻辑需要确保能在 updateFavoritesPopup 之外访问，或者重新计算)
-                    // 最好是在 updateFavoritesPopup 内部处理分页点击，因为它有最新的数据
-                    // 或者将 totalPages 存储在 favoritesPopup.dom 或其他地方
                     const chatMetadata = ensureFavoritesArrayExists();
                     const totalFavorites = chatMetadata ? chatMetadata.favorites.length : 0;
                     const totalPages = Math.max(1, Math.ceil(totalFavorites / itemsPerPage));
@@ -540,47 +529,59 @@ function showFavoritesPopup() {
                         updateFavoritesPopup();
                     }
                 }
-                // Handle close button within the container
+                // Handle close button
                 else if (target.hasClass('close-popup')) {
                     favoritesPopup.hide();
                 }
-                // Handle clear invalid button within the container
+                // Handle clear invalid button
                 else if (target.hasClass('clear-invalid')) {
                     handleClearInvalidFavorites();
                 }
-                // Handle edit note (pencil icon) within the container
+                // Handle edit note (pencil icon)
                 else if (target.hasClass('fa-pencil')) {
                     const favItem = target.closest('.favorite-item');
-                    const favId = favItem.data('fav-id');
-                    handleEditNote(favId);
+                    // 添加检查 favItem 是否存在
+                    if (favItem && favItem.length) {
+                         const favId = favItem.data('fav-id');
+                         handleEditNote(favId);
+                    } else {
+                         console.warn(`${pluginName}: Clicked edit icon, but couldn't find parent .favorite-item`);
+                    }
                 }
-                // Handle delete favorite (trash icon) within the container
+                // Handle delete favorite (trash icon)
                 else if (target.hasClass('fa-trash')) {
                     const favItem = target.closest('.favorite-item');
-                    const favId = favItem.data('fav-id');
-                    const msgId = favItem.data('msg-id');
-                    handleDeleteFavoriteFromPopup(favId, msgId);
+                     // 添加检查 favItem 是否存在
+                    if (favItem && favItem.length) {
+                        const favId = favItem.data('fav-id');
+                        const msgId = favItem.data('msg-id');
+                        handleDeleteFavoriteFromPopup(favId, msgId);
+                    } else {
+                         console.warn(`${pluginName}: Clicked delete icon, but couldn't find parent .favorite-item`);
+                    }
                 }
             });
 
         } catch (error) {
-            console.error(`${pluginName}: Failed to create popup instance:`, error);
-            favoritesPopup = null; // 创建失败，重置变量
-            return; // 退出函数
+            console.error(`${pluginName}: Failed during popup creation or event listener setup:`, error);
+            favoritesPopup = null;
+            return;
         }
     } else {
-         // --- 调试日志 ---
          console.log(`${pluginName}: Reusing existing popup instance.`);
     }
 
-
-    // Reset to first page when opening
     currentPage = 1;
-    // Update popup content (调用这个函数来填充实际内容)
-    updateFavoritesPopup();
-    // Show the popup
-    if (favoritesPopup) { // 再次检查以防创建失败
-        favoritesPopup.show();
+    updateFavoritesPopup(); // 这个函数内部会设置 content
+
+    if (favoritesPopup) {
+        try {
+            favoritesPopup.show();
+        } catch(showError) {
+             console.error(`${pluginName}: Error showing popup:`, showError);
+             // 可以尝试重置 favoritesPopup，以便下次重新创建
+             // favoritesPopup = null;
+        }
     }
 }
 
